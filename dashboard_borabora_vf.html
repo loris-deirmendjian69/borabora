@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Atmosphérique — Bora Bora</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+  :root {
+    --bg: #0b0c18; --bg2: #12131f; --bg3: #1a1b2e;
+    --A: #38bdf8; --B: #818cf8; --C: #fb923c; --D: #4ade80; --E: #f472b6;
+    --text: #e2e8f0; --muted: #64748b; --border: rgba(255,255,255,0.07);
+    --accent: #f472b6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* HEADER */
+  .header { background: linear-gradient(135deg, #0b0c18, #160d2e 50%, #0b1828);
+    padding: 28px 36px 22px; border-bottom: 1px solid rgba(244,114,182,0.15); }
+  .header h1 { font-size: 22px; font-weight: 800;
+    background: linear-gradient(90deg, #f472b6, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header p { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+  /* TABS */
+  .tabs { display: flex; background: var(--bg2); border-bottom: 1px solid var(--border); overflow-x: auto; padding: 0 36px; }
+  .tab { padding: 14px 22px; background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--muted); cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 500;
+    white-space: nowrap; transition: all .2s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
+
+  /* CONTENT */
+  .content { padding: 28px 36px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* SECTION TITLE */
+  .section-title { font-size: 15px; font-weight: 700; color: var(--accent); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+  /* CARD */
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 20px; position: relative; }
+  .card + .card { margin-top: 20px; }
+
+  /* EXPORT BTN */
+  .export-btn { position: absolute; top: 14px; right: 14px; background: rgba(244,114,182,0.12);
+    border: 1px solid rgba(244,114,182,0.3); color: var(--accent); border-radius: 8px;
+    padding: 5px 12px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit;
+    transition: all .2s; z-index: 10; }
+  .export-btn:hover { background: rgba(244,114,182,0.25); }
+
+  /* STAT PILLS */
+  .stat-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .pill { padding: 5px 16px; border-radius: 20px; border: none; cursor: pointer; font-family: inherit;
+    font-size: 12px; font-weight: 700; transition: all .2s; }
+
+  /* TABLE */
+  .tbl-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { padding: 10px 12px; text-align: left; font-weight: 700; border-bottom: 2px solid rgba(244,114,182,0.2); white-space: nowrap; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 11px; white-space: nowrap; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  td.is-max { color: #4ade80; font-weight: 700; }
+  td.is-min { color: #fb923c; font-weight: 700; }
+  td.is-bb  { color: #f472b6; font-weight: 700; }
+  .legend-row { display: flex; gap: 18px; margin-top: 10px; font-size: 11px; color: var(--muted); }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
+  @media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  /* CHART CONTAINER */
+  .chart-box { position: relative; }
+  .chart-box canvas { max-height: 320px; }
+
+  /* SELECT */
+  select { background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px; font-family: inherit; font-size: 13px; cursor: pointer; }
+
+  /* GROUP TOGGLES */
+  .group-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .gbtn { padding: 5px 14px; border-radius: 20px; cursor: pointer; font-family: inherit;
+    font-size: 12px; font-weight: 700; transition: all .2s; }
+
+  /* PCA */
+  .pca-canvas-wrap { position: relative; background: var(--bg3); border-radius: 12px; overflow: hidden; }
+  .cluster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 18px; }
+  .cluster-card { background: var(--bg3); border-radius: 10px; padding: 14px; border-left: 3px solid var(--accent); }
+  .cluster-card li { font-size: 12px; color: var(--muted); margin-top: 5px; list-style: none; padding-left: 14px; position: relative; }
+  .cluster-card li::before { content: "▸"; position: absolute; left: 0; }
+
+  /* CONTROLS ROW */
+  .ctrl-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .ctrl-label { color: var(--muted); font-size: 13px; }
+
+  /* BOXPLOT SVG */
+  .boxplot-grid { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
+  .bp-item { text-align: center; }
+  .bp-name { font-size: 12px; font-weight: 700; margin-top: 6px; }
+  .bp-sub  { font-size: 10px; color: var(--muted); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: #2a2b40; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏝️ Dashboard Atmosphérique — Bora Bora</h1>
+  <p>5 groupes climatiques · 14 variables · MEAN / SD / MEDIAN / MIN / MAX · Groupe E = site d'étude Bora Bora</p>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('tableau')">Tableau</button>
+  <button class="tab" onclick="switchTab('boxplots')">Boxplots</button>
+  <button class="tab" onclick="switchTab('radar')">Radar</button>
+  <button class="tab" onclick="switchTab('comparaison')">Comparaison</button>
+  <button class="tab" onclick="switchTab('variables')">Toutes Variables</button>
+  <button class="tab" onclick="switchTab('pca')">ACP / Clusters</button>
+</div>
+
+<div class="content">
+
+<!-- ═══════════ TABLEAU ═══════════ -->
+<div id="panel-tableau" class="panel active">
+  <div class="card" id="card-tableau">
+    <button class="export-btn" onclick="exportCard('card-tableau','tableau')">⬇ PNG</button>
+    <div class="section-title">📋 Tableau statistique comparatif</div>
+    <div class="stat-pills" id="stat-pills"></div>
+    <div class="tbl-wrap"><table id="main-table"></table></div>
+    <div class="legend-row">
+      <span><span style="color:#4ade80">■</span> Max inter-groupe</span>
+      <span><span style="color:#fb923c">■</span> Min inter-groupe</span>
+      <span><span style="color:#f472b6">■</span> Bora Bora (E)</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ BOXPLOTS ═══════════ -->
+<div id="panel-boxplots" class="panel">
+  <div class="ctrl-row">
+    <span class="ctrl-label">Variable :</span>
+    <select id="bp-var-sel" onchange="renderBoxplots()"></select>
+  </div>
+  <div class="card" id="card-boxplots">
+    <button class="export-btn" onclick="exportCard('card-boxplots','boxplots')">⬇ PNG</button>
+    <div class="section-title" id="bp-title">📦 Boxplots</div>
+    <div class="boxplot-grid" id="boxplot-grid"></div>
+    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:12px">
+      whiskers = MIN/MAX &nbsp;│&nbsp; boîte = ±0.674σ autour médiane &nbsp;│&nbsp; ● = MEAN &nbsp;│&nbsp; barre pleine = MEDIAN
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ RADAR ═══════════ -->
+<div id="panel-radar" class="panel">
+  <div class="ctrl-row">
+    <span class="ctrl-label">Groupes :</span>
+    <div class="group-btns" id="radar-group-btns"></div>
+  </div>
+  <div class="card" id="card-radar">
+    <button class="export-btn" onclick="exportCard('card-radar','radar')">⬇ PNG</button>
+    <div class="section-title">🕸️ Radar — toutes variables normalisées</div>
+    <div class="chart-box" style="max-width:680px;margin:0 auto;">
+      <canvas id="radar-chart" height="420"></canvas>
+    </div>
+    <p style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px">Valeurs normalisées 0–1 par variable (0=min inter-groupes, 1=max)</p>
+  </div>
+</div>
+
+<!-- ═══════════ COMPARAISON ═══════════ -->
+<div id="panel-comparaison" class="panel">
+  <div class="ctrl-row">
+    <span class="ctrl-label">Variable :</span>
+    <select id="cmp-var-sel" onchange="renderComparaison()"></select>
+    <span class="ctrl-label" style="margin-left:12px">Stat :</span>
+    <div class="stat-pills" id="cmp-stat-pills"></div>
+  </div>
+  <div class="card" id="card-comparaison">
+    <button class="export-btn" onclick="exportCard('card-comparaison','comparaison')">⬇ PNG</button>
+    <div class="section-title" id="cmp-title">📊 Comparaison inter-groupes</div>
+    <div class="chart-box"><canvas id="cmp-chart" height="260"></canvas></div>
+  </div>
+</div>
+
+<!-- ═══════════ TOUTES VARIABLES ═══════════ -->
+<div id="panel-variables" class="panel">
+  <div class="ctrl-row">
+    <span class="ctrl-label">Stat :</span>
+    <div class="stat-pills" id="all-stat-pills"></div>
+    <button class="export-btn" style="position:static;margin-left:auto" onclick="exportAllCards()">⬇ Tout exporter</button>
+  </div>
+  <div class="grid-auto" id="all-vars-grid"></div>
+</div>
+
+<!-- ═══════════ ACP / CLUSTERS ═══════════ -->
+<div id="panel-pca" class="panel">
+  <div class="card" id="card-pca">
+    <button class="export-btn" onclick="exportCard('card-pca','pca')">⬇ PNG</button>
+    <div class="section-title">🔬 ACP simplifiée — positionnement climatique</div>
+    <div style="color:var(--muted);font-size:13px;margin-bottom:14px">
+      PC1 ≈ gradient thermique + insolation (var. expliquée ~42%) &nbsp;·&nbsp; PC2 ≈ aérosols + vent (var. expliquée ~28%)
+    </div>
+    <div class="pca-canvas-wrap" style="max-width:700px;margin:0 auto;">
+      <canvas id="pca-chart" height="400"></canvas>
+    </div>
+  </div>
+  <div class="cluster-grid" id="cluster-grid"></div>
+</div>
+
+</div><!-- /content -->
+
+<script>
+// ═══════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════
+const GROUPS = {
+  A: { label:"Océanique OUEST", short:"Oc.OUEST", color:"#38bdf8" },
+  B: { label:"Océanique NORD",  short:"Oc.NORD",  color:"#818cf8" },
+  C: { label:"Méditerranée",    short:"Méditer.",  color:"#fb923c" },
+  D: { label:"Continental",     short:"Continen.", color:"#4ade80" },
+  E: { label:"Bora Bora",       short:"BoraBora",  color:"#f472b6" },
+};
+
+const VARS = [
+  { key:"_P_seasonm", label:"P. saisonnalité",  unit:"",          fmt:"2" },
+  { key:"_T_seasonm", label:"T. saisonnalité",  unit:"",          fmt:"2" },
+  { key:"_P_yearlym", label:"P. annuelle",       unit:"mm",        fmt:"1" },
+  { key:"_T_yearlym", label:"T. annuelle",       unit:"°C",        fmt:"2" },
+  { key:"_T_maxmean", label:"T. max",            unit:"°C",        fmt:"2" },
+  { key:"_T_minmean", label:"T. min",            unit:"°C",        fmt:"2" },
+  { key:"AOD",        label:"AOD",               unit:"",          fmt:"4" },
+  { key:"dust",       label:"Poussière (dust)",  unit:"",          fmt:"e" },
+  { key:"hydrophili", label:"Hydrophile",        unit:"",          fmt:"e" },
+  { key:"hydropho",   label:"Hydrophobe",        unit:"",          fmt:"e" },
+  { key:"seasalt",    label:"Sel marin",         unit:"",          fmt:"e" },
+  { key:"sulphate",   label:"Sulfate",           unit:"",          fmt:"e" },
+  { key:"_solarmean", label:"Insolation",        unit:"kJ/m²/j",   fmt:"0" },
+  { key:"_windmean",  label:"Vent",              unit:"m/s",       fmt:"3" },
+];
+
+const DATA = {
+  A:{
+    MEAN:{_P_seasonm:22.867,_T_seasonm:491.662,_P_yearlym:892.715,_T_yearlym:12.107,_T_maxmean:24.118,_T_minmean:2.730,AOD:0.13957,dust:1.796e-6,hydrophili:1.879e-6,hydropho:9.277e-6,seasalt:4.168e-5,sulphate:3.735e-6,_solarmean:11299.0,_windmean:3.742},
+    SD:  {_P_seasonm:5.319,_T_seasonm:47.631,_P_yearlym:174.653,_T_yearlym:0.814,_T_maxmean:1.664,_T_minmean:1.044,AOD:0.00282,dust:5.09e-7,hydrophili:1.47e-7,hydropho:2.71e-7,seasalt:6.01e-6,sulphate:2.19e-7,_solarmean:514.6,_windmean:0.969},
+    MEDIAN:{_P_seasonm:22.276,_T_seasonm:498.484,_P_yearlym:824.5,_T_yearlym:12.006,_T_maxmean:24.5,_T_minmean:2.600,AOD:0.13991,dust:1.576e-6,hydrophili:1.917e-6,hydropho:9.357e-6,seasalt:4.252e-5,sulphate:3.666e-6,_solarmean:11360.1,_windmean:3.653},
+    MIN: {_P_seasonm:12.182,_T_seasonm:332.943,_P_yearlym:685.025,_T_yearlym:10.053,_T_maxmean:19.526,_T_minmean:1.094,AOD:0.13136,dust:1.12e-6,hydrophili:1.44e-6,hydropho:8.64e-6,seasalt:2.79e-5,sulphate:3.47e-6,_solarmean:9800.5,_windmean:2.275},
+    MAX: {_P_seasonm:37.258,_T_seasonm:575.286,_P_yearlym:1446.25,_T_yearlym:14.186,_T_maxmean:27.200,_T_minmean:5.637,AOD:0.14480,dust:2.68e-6,hydrophili:2.15e-6,hydropho:9.85e-6,seasalt:5.53e-5,sulphate:4.19e-6,_solarmean:12589.0,_windmean:6.856},
+  },
+  B:{
+    MEAN:{_P_seasonm:12.217,_T_seasonm:569.139,_P_yearlym:695.745,_T_yearlym:10.815,_T_maxmean:24.376,_T_minmean:0.671,AOD:0.14020,dust:1.527e-6,hydrophili:2.340e-6,hydropho:1.013e-5,seasalt:3.574e-5,sulphate:3.632e-6,_solarmean:10635.5,_windmean:3.648},
+    SD:  {_P_seasonm:2.476,_T_seasonm:33.361,_P_yearlym:61.498,_T_yearlym:0.641,_T_maxmean:1.042,_T_minmean:0.925,AOD:0.00398,dust:1.74e-7,hydrophili:1.48e-7,hydropho:2.98e-7,seasalt:3.28e-6,sulphate:7.31e-8,_solarmean:449.2,_windmean:0.431},
+    MEDIAN:{_P_seasonm:11.957,_T_seasonm:567.292,_P_yearlym:690.820,_T_yearlym:10.848,_T_maxmean:24.700,_T_minmean:0.600,AOD:0.14068,dust:1.524e-6,hydrophili:2.333e-6,hydropho:1.016e-5,seasalt:3.631e-5,sulphate:3.652e-6,_solarmean:10669.5,_windmean:3.601},
+    MIN: {_P_seasonm:8.032,_T_seasonm:457.757,_P_yearlym:584.791,_T_yearlym:8.535,_T_maxmean:20.685,_T_minmean:-2.0,AOD:0.13014,dust:1.10e-6,hydrophili:1.98e-6,hydropho:9.14e-6,seasalt:2.47e-5,sulphate:3.44e-6,_solarmean:9517.4,_windmean:2.642},
+    MAX: {_P_seasonm:27.908,_T_seasonm:670.898,_P_yearlym:954.670,_T_yearlym:11.835,_T_maxmean:26.797,_T_minmean:2.935,AOD:0.14858,dust:1.87e-6,hydrophili:2.65e-6,hydropho:1.08e-5,seasalt:4.19e-5,sulphate:3.73e-6,_solarmean:11233.6,_windmean:6.133},
+  },
+  C:{
+    MEAN:{_P_seasonm:38.912,_T_seasonm:597.127,_P_yearlym:647.937,_T_yearlym:15.017,_T_maxmean:28.400,_T_minmean:3.866,AOD:0.13979,dust:3.453e-6,hydrophili:2.144e-6,hydropho:1.036e-5,seasalt:2.648e-5,sulphate:4.735e-6,_solarmean:13582.4,_windmean:5.558},
+    SD:  {_P_seasonm:3.546,_T_seasonm:26.506,_P_yearlym:62.721,_T_yearlym:0.645,_T_maxmean:0.884,_T_minmean:1.009,AOD:0.00401,dust:3.64e-7,hydrophili:1.63e-7,hydropho:5.20e-7,seasalt:1.70e-6,sulphate:2.87e-7,_solarmean:289.1,_windmean:0.694},
+    MEDIAN:{_P_seasonm:39.318,_T_seasonm:604.317,_P_yearlym:656.143,_T_yearlym:15.024,_T_maxmean:28.400,_T_minmean:3.700,AOD:0.14165,dust:3.43e-6,hydrophili:2.211e-6,hydropho:1.067e-5,seasalt:2.764e-5,sulphate:4.789e-6,_solarmean:13584.4,_windmean:5.836},
+    MIN: {_P_seasonm:25.245,_T_seasonm:495.333,_P_yearlym:479.232,_T_yearlym:11.631,_T_maxmean:23.241,_T_minmean:0.524,AOD:0.12777,dust:2.87e-6,hydrophili:1.64e-6,hydropho:8.57e-6,seasalt:2.19e-5,sulphate:4.12e-6,_solarmean:12694.2,_windmean:3.25},
+    MAX: {_P_seasonm:50.375,_T_seasonm:672.151,_P_yearlym:849.0,_T_yearlym:17.260,_T_maxmean:30.548,_T_minmean:7.159,AOD:0.14512,dust:4.75e-6,hydrophili:2.38e-6,hydropho:1.12e-5,seasalt:2.764e-5,sulphate:5.52e-6,_solarmean:14324.2,_windmean:6.206},
+  },
+  D:{
+    MEAN:{_P_seasonm:17.040,_T_seasonm:602.675,_P_yearlym:921.124,_T_yearlym:9.911,_T_maxmean:24.112,_T_minmean:-1.127,AOD:0.12431,dust:2.165e-6,hydrophili:2.042e-6,hydropho:8.878e-6,seasalt:2.583e-5,sulphate:3.502e-6,_solarmean:11864.0,_windmean:3.331},
+    SD:  {_P_seasonm:4.834,_T_seasonm:37.211,_P_yearlym:204.245,_T_yearlym:2.684,_T_maxmean:2.697,_T_minmean:2.555,AOD:0.00868,dust:3.87e-7,hydrophili:2.33e-7,hydropho:7.60e-7,seasalt:3.98e-6,sulphate:3.08e-7,_solarmean:752.7,_windmean:0.783},
+    MEDIAN:{_P_seasonm:15.513,_T_seasonm:600.539,_P_yearlym:866.585,_T_yearlym:10.706,_T_maxmean:24.702,_T_minmean:-0.394,AOD:0.12721,dust:2.01e-6,hydrophili:1.99e-6,hydropho:8.86e-6,seasalt:2.65e-5,sulphate:3.51e-6,_solarmean:11677.2,_windmean:3.063},
+    MIN: {_P_seasonm:8.199,_T_seasonm:506.613,_P_yearlym:582.677,_T_yearlym:-1.382,_T_maxmean:11.597,_T_minmean:-10.802,AOD:0.09414,dust:1.48e-6,hydrophili:1.63e-6,hydropho:7.11e-6,seasalt:1.39e-5,sulphate:2.67e-6,_solarmean:10617.1,_windmean:1.775},
+    MAX: {_P_seasonm:36.930,_T_seasonm:698.263,_P_yearlym:1619.184,_T_yearlym:14.121,_T_maxmean:29.300,_T_minmean:3.370,AOD:0.14448,dust:3.22e-6,hydrophili:2.54e-6,hydropho:1.14e-5,seasalt:3.36e-5,sulphate:4.88e-6,_solarmean:14245.4,_windmean:7.520},
+  },
+  E:{
+    MEAN:{_P_seasonm:40.597,_T_seasonm:84.069,_P_yearlym:1862.931,_T_yearlym:26.158,_T_maxmean:30.052,_T_minmean:22.352,AOD:0.10361,dust:1.076e-7,hydrophili:2.632e-7,hydropho:4.680e-6,seasalt:1.176e-6,sulphate:2.409e-6,_solarmean:16337.1,_windmean:4.630},
+    SD:  {_P_seasonm:1.777,_T_seasonm:1.071,_P_yearlym:42.009,_T_yearlym:0.365,_T_maxmean:0.356,_T_minmean:0.377,AOD:0.02476,dust:5.75e-8,hydrophili:1.86e-7,hydropho:1.78e-6,seasalt:2.64e-7,sulphate:7.41e-7,_solarmean:404.5,_windmean:0.103},
+    MEDIAN:{_P_seasonm:40.372,_T_seasonm:84.059,_P_yearlym:1888.0,_T_yearlym:26.208,_T_maxmean:30.200,_T_minmean:22.400,AOD:0.10171,dust:9.55e-8,hydrophili:1.98e-7,hydropho:4.583e-6,seasalt:1.175e-6,sulphate:2.294e-6,_solarmean:16494.4,_windmean:4.600},
+    MIN: {_P_seasonm:37.369,_T_seasonm:81.613,_P_yearlym:1781.0,_T_yearlym:25.204,_T_maxmean:29.100,_T_minmean:21.400,AOD:0.05410,dust:2.42e-8,hydrophili:8.28e-8,hydropho:1.692e-6,seasalt:5.39e-7,sulphate:1.094e-6,_solarmean:15486.7,_windmean:4.533},
+    MAX: {_P_seasonm:44.005,_T_seasonm:85.850,_P_yearlym:1903.0,_T_yearlym:26.675,_T_maxmean:30.500,_T_minmean:22.900,AOD:0.20092,dust:4.34e-7,hydrophili:1.264e-6,hydropho:1.045e-5,seasalt:2.132e-6,sulphate:6.483e-6,_solarmean:16871.5,_windmean:4.892},
+  },
+};
+
+const STATS = ["MEAN","SD","MEDIAN","MIN","MAX"];
+const GK = Object.keys(GROUPS);
+
+// ── Format ──
+function fmt(v, f) {
+  if (v===null||v===undefined) return "—";
+  if (f==="e") return v.toExponential(3);
+  if (f==="0") return v.toFixed(0);
+  if (f==="2") return v.toFixed(2);
+  if (f==="3") return v.toFixed(3);
+  if (f==="4") return v.toFixed(4);
+  return v.toFixed(2);
+}
+
+// ── Normalise 0-1 ──
+function norm(val, key) {
+  const all = GK.map(g => DATA[g].MEAN[key]);
+  const mn = Math.min(...all), mx = Math.max(...all);
+  return mx===mn ? 0.5 : (val-mn)/(mx-mn);
+}
+
+// ── Hex to rgba ──
+function hexA(hex, a) {
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+let currentStat = "MEAN";
+let cmpStat = "MEAN";
+let allStat = "MEAN";
+let radarGroups = [...GK];
+let charts = {};
+
+// ═══════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('panel-'+name).classList.add('active');
+}
+
+// ═══════════════════════════════════════════
+//  EXPORT PNG
+// ═══════════════════════════════════════════
+function exportCard(id, name) {
+  const el = document.getElementById(id);
+  html2canvas(el, { backgroundColor:'#12131f', scale:2, useCORS:true }).then(canvas => {
+    const a = document.createElement('a');
+    a.download = `bora_bora_${name}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  });
+}
+
+function exportAllCards() {
+  document.querySelectorAll('#all-vars-grid .card').forEach((card, i) => {
+    setTimeout(() => {
+      html2canvas(card, { backgroundColor:'#12131f', scale:2 }).then(canvas => {
+        const a = document.createElement('a');
+        a.download = `bora_bora_var_${i+1}.png`;
+        a.href = canvas.toDataURL('image/png');
+        a.click();
+      });
+    }, i * 300);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  TABLEAU
+// ═══════════════════════════════════════════
+function buildStatPills(containerId, current, setCb) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  STATS.forEach(s => {
+    const b = document.createElement('button');
+    b.className = 'pill';
+    b.textContent = s;
+    b.style.background = s===current ? '#f472b6' : 'rgba(255,255,255,0.07)';
+    b.style.color = s===current ? '#0f0f1a' : '#94a3b8';
+    b.style.border = 'none';
+    b.onclick = () => { setCb(s); };
+    el.appendChild(b);
+  });
+}
+
+function renderTable() {
+  buildStatPills('stat-pills', currentStat, s => { currentStat=s; renderTable(); });
+  const tbl = document.getElementById('main-table');
+  let html = '<thead><tr><th style="color:#f472b6">Variable</th><th style="color:#64748b">Unité</th>';
+  GK.forEach(k => { html += `<th style="color:${GROUPS[k].color}">${GROUPS[k].short}</th>`; });
+  html += '</tr></thead><tbody>';
+  VARS.forEach((v,i) => {
+    const vals = GK.map(k => DATA[k][currentStat][v.key]);
+    const mx = Math.max(...vals), mn = Math.min(...vals);
+    html += `<tr>`;
+    html += `<td style="color:#e2e8f0;font-weight:600;font-family:'DM Sans',sans-serif">${v.label}</td>`;
+    html += `<td style="color:#475569;font-size:10px">${v.unit||'—'}</td>`;
+    GK.forEach((k,j) => {
+      const val = vals[j];
+      let cls = k==='E'?'is-bb':(val===mx?'is-max':(val===mn?'is-min':''));
+      html += `<td class="${cls}">${fmt(val,v.fmt)}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  tbl.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════
+//  BOXPLOTS
+// ═══════════════════════════════════════════
+function buildVarSelect(id, cb) {
+  const sel = document.getElementById(id);
+  VARS.forEach(v => {
+    const o = document.createElement('option');
+    o.value = v.key; o.text = v.label + (v.unit?` (${v.unit})`:'');
+    sel.appendChild(o);
+  });
+  sel.value = '_T_yearlym';
+  sel.onchange = cb;
+}
+
+function renderBoxplots() {
+  const key = document.getElementById('bp-var-sel').value;
+  const vInfo = VARS.find(v=>v.key===key);
+  document.getElementById('bp-title').textContent = `📦 Boxplots — ${vInfo.label}${vInfo.unit?' ('+vInfo.unit+')':''}`;
+  const grid = document.getElementById('boxplot-grid');
+  grid.innerHTML = '';
+  const allVals = GK.flatMap(k=>[DATA[k].MIN[key],DATA[k].MAX[key]]);
+  const yMin = Math.min(...allVals), yMax = Math.max(...allVals);
+  const range = yMax - yMin || 1;
+  const H = 240, PAD = 20;
+  const toY = v => PAD + (1-(v-yMin)/range)*(H-PAD*2);
+
+  GK.forEach(k => {
+    const g = GROUPS[k];
+    const mn = DATA[k].MIN[key], mx = DATA[k].MAX[key];
+    const med = DATA[k].MEDIAN[key], mean = DATA[k].MEAN[key], sd = DATA[k].SD[key];
+    const q1 = med - sd*0.674, q3 = med + sd*0.674;
+    const yMx=toY(mx), yMn=toY(mn), yMed=toY(med), yMean=toY(mean), yQ1=toY(q1), yQ3=toY(q3);
+    const boxT=Math.min(yQ1,yQ3), boxH=Math.max(Math.abs(yQ3-yQ1),2);
+
+    const item = document.createElement('div'); item.className='bp-item';
+    item.innerHTML = `
+      <svg width="80" height="${H}" style="overflow:visible">
+        <line x1="40" y1="${yMx}" x2="40" y2="${yMn}" stroke="${g.color}" stroke-width="1.5" stroke-dasharray="3,2"/>
+        <line x1="28" y1="${yMx}" x2="52" y2="${yMx}" stroke="${g.color}" stroke-width="2"/>
+        <line x1="28" y1="${yMn}" x2="52" y2="${yMn}" stroke="${g.color}" stroke-width="2"/>
+        <rect x="16" y="${boxT}" width="48" height="${boxH}" fill="${hexA(g.color,0.22)}" stroke="${g.color}" stroke-width="1.5" rx="3"/>
+        <line x1="16" y1="${yMed}" x2="64" y2="${yMed}" stroke="${g.color}" stroke-width="3"/>
+        <circle cx="40" cy="${yMean}" r="5" fill="${g.color}" stroke="#0b0c18" stroke-width="1.5"/>
+        <text x="40" y="${yMx-7}" text-anchor="middle" fill="#64748b" font-size="9">${fmt(mx,vInfo.fmt)}</text>
+        <text x="40" y="${yMn+15}" text-anchor="middle" fill="#64748b" font-size="9">${fmt(mn,vInfo.fmt)}</text>
+      </svg>
+      <div class="bp-name" style="color:${g.color}">${g.short}</div>
+      <div class="bp-sub">μ = ${fmt(mean,vInfo.fmt)}</div>
+      <div class="bp-sub">σ = ${fmt(sd,vInfo.fmt)}</div>
+      <div class="bp-sub">med = ${fmt(med,vInfo.fmt)}</div>`;
+    grid.appendChild(item);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  RADAR
+// ═══════════════════════════════════════════
+function buildRadarGroupBtns() {
+  const wrap = document.getElementById('radar-group-btns');
+  wrap.innerHTML='';
+  GK.forEach(k=>{
+    const b = document.createElement('button'); b.className='gbtn';
+    b.textContent = GROUPS[k].short;
+    b.style.border = `2px solid ${GROUPS[k].color}`;
+    b.style.background = radarGroups.includes(k)?GROUPS[k].color:'transparent';
+    b.style.color = radarGroups.includes(k)?'#0b0c18':GROUPS[k].color;
+    b.onclick = () => {
+      if (radarGroups.includes(k)) { if(radarGroups.length>1) radarGroups=radarGroups.filter(x=>x!==k); }
+      else radarGroups.push(k);
+      buildRadarGroupBtns(); renderRadar();
+    };
+    wrap.appendChild(b);
+  });
+}
+
+function renderRadar() {
+  if (charts.radar) { charts.radar.destroy(); }
+  const labels = VARS.map(v=>v.label);
+  const datasets = radarGroups.map(k => ({
+    label: GROUPS[k].short,
+    data: VARS.map(v => norm(DATA[k].MEAN[v.key], v.key)),
+    borderColor: GROUPS[k].color,
+    backgroundColor: hexA(GROUPS[k].color, 0.1),
+    borderWidth: k==='E'?3:1.5,
+    pointBackgroundColor: GROUPS[k].color,
+    pointRadius: k==='E'?4:2,
+  }));
+  charts.radar = new Chart(document.getElementById('radar-chart'), {
+    type:'radar',
+    data:{ labels, datasets },
+    options:{
+      responsive:true, maintainAspectRatio:true,
+      scales:{ r:{ min:0, max:1, grid:{ color:'rgba(255,255,255,0.07)' }, angleLines:{ color:'rgba(255,255,255,0.07)' },
+        ticks:{ display:false }, pointLabels:{ color:'#94a3b8', font:{ size:11, family:"'DM Sans'" } } } },
+      plugins:{ legend:{ labels:{ color:'#94a3b8', font:{ size:12 } } } }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════
+//  COMPARAISON
+// ═══════════════════════════════════════════
+function buildCmpStatPills() {
+  buildStatPills('cmp-stat-pills', cmpStat, s => { cmpStat=s; buildStatPills('cmp-stat-pills',cmpStat,()=>{}); renderComparaison(); });
+}
+
+function renderComparaison() {
+  buildStatPills('cmp-stat-pills', cmpStat, s => { cmpStat=s; renderComparaison(); });
+  if (charts.cmp) charts.cmp.destroy();
+  const key = document.getElementById('cmp-var-sel').value;
+  const vInfo = VARS.find(v=>v.key===key);
+  document.getElementById('cmp-title').textContent = `📊 ${vInfo.label}${vInfo.unit?' ('+vInfo.unit+')':''} — ${cmpStat}`;
+  const vals = GK.map(k=>DATA[k][cmpStat][key]);
+  charts.cmp = new Chart(document.getElementById('cmp-chart'), {
+    type:'bar',
+    data:{ labels:GK.map(k=>GROUPS[k].short),
+      datasets:[{ data:vals, backgroundColor:GK.map(k=>hexA(GROUPS[k].color,k==='E'?0.9:0.6)),
+        borderColor:GK.map(k=>GROUPS[k].color), borderWidth:2, borderRadius:8 }] },
+    options:{
+      responsive:true, maintainAspectRatio:true,
+      plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label: ctx => `${fmt(ctx.raw,vInfo.fmt)}${vInfo.unit?' '+vInfo.unit:''}` },
+          backgroundColor:'#1a1b2e', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#e2e8f0', bodyColor:'#94a3b8' } },
+      scales:{ x:{ grid:{display:false}, ticks:{color:'#64748b'} }, y:{ grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748b'} } }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════
+//  TOUTES VARIABLES — un graphe par variable
+// ═══════════════════════════════════════════
+function renderAllVars() {
+  buildStatPills('all-stat-pills', allStat, s => { allStat=s; renderAllVars(); });
+  // détruire anciens charts
+  Object.keys(charts).filter(k=>k.startsWith('all_')).forEach(k=>{charts[k].destroy();delete charts[k];});
+  const grid = document.getElementById('all-vars-grid');
+  grid.innerHTML='';
+
+  VARS.forEach((v,i) => {
+    const cardId = `all-card-${i}`;
+    const canvasId = `all-canvas-${i}`;
+    const card = document.createElement('div'); card.className='card'; card.id=cardId;
+    card.innerHTML = `
+      <button class="export-btn" onclick="exportCard('${cardId}','var_${v.key}')">⬇ PNG</button>
+      <div style="font-weight:700;color:#e2e8f0;font-size:13px;margin-bottom:4px">${v.label}${v.unit?' <span style=color:#475569;font-size:11px>('+v.unit+')</span>':''}</div>
+      <div style="color:#475569;font-size:11px;margin-bottom:12px">${allStat}</div>
+      <canvas id="${canvasId}" height="180"></canvas>`;
+    grid.appendChild(card);
+
+    // rendre le chart
+    setTimeout(()=>{
+      const vals = GK.map(k=>DATA[k][allStat][v.key]);
+      charts['all_'+i] = new Chart(document.getElementById(canvasId), {
+        type:'bar',
+        data:{ labels:GK.map(k=>GROUPS[k].short),
+          datasets:[{ data:vals, backgroundColor:GK.map(k=>hexA(GROUPS[k].color,k==='E'?0.9:0.55)),
+            borderColor:GK.map(k=>GROUPS[k].color), borderWidth:1.5, borderRadius:6 }] },
+        options:{
+          responsive:true, maintainAspectRatio:true,
+          plugins:{ legend:{display:false},
+            tooltip:{ callbacks:{ label: ctx=>`${fmt(ctx.raw,v.fmt)}${v.unit?' '+v.unit:''}` },
+              backgroundColor:'#1a1b2e', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#e2e8f0', bodyColor:'#94a3b8' } },
+          scales:{ x:{ grid:{display:false}, ticks:{color:'#64748b',font:{size:10}} }, y:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#64748b',font:{size:9},
+            callback: val => v.fmt==='e'?val.toExponential(1):val } } }
+        }
+      });
+    }, 0);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  ACP / CLUSTERS
+// ═══════════════════════════════════════════
+function renderPCA() {
+  if (charts.pca) charts.pca.destroy();
+  const pts = GK.map(k=>{
+    const n = key => norm(DATA[k].MEAN[key], key);
+    const pc1 = (n('_T_yearlym')*2+n('_T_maxmean')+n('_T_minmean')*1.5+n('_solarmean')*1.5-n('_P_yearlym')*0.8-n('_T_seasonm')*0.5)/6.3*4-1.5;
+    const pc2 = (n('AOD')+n('dust')*0.8+n('sulphate')*0.8+n('_windmean')*0.5-n('_T_minmean')*1.5)/4.6*3-1.2;
+    return { x:pc1, y:pc2, label:GROUPS[k].short, color:GROUPS[k].color, group:k };
+  });
+  charts.pca = new Chart(document.getElementById('pca-chart'), {
+    type:'scatter',
+    data:{ datasets:[{ data:pts, backgroundColor:pts.map(p=>hexA(p.color,0.25)), borderColor:pts.map(p=>p.color), borderWidth:2, pointRadius:22, pointHoverRadius:24 }] },
+    options:{
+      responsive:true, maintainAspectRatio:true,
+      plugins:{
+        legend:{display:false},
+        tooltip:{ callbacks:{ label: ctx => {
+          const p=ctx.raw; return [`${GROUPS[p.group].label}`, `PC1: ${p.x.toFixed(2)} | PC2: ${p.y.toFixed(2)}`];
+        }}, backgroundColor:'#1a1b2e', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#e2e8f0', bodyColor:'#94a3b8' }
+      },
+      scales:{
+        x:{ title:{display:true,text:'PC1 — Température / Insolation →',color:'#475569',font:{size:12}}, grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748b'} },
+        y:{ title:{display:true,text:'PC2 — Aérosols / Vent →',color:'#475569',font:{size:12}}, grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748b'} }
+      }
+    },
+    plugins:[{
+      id:'labels',
+      afterDraw(chart){
+        const ctx2=chart.ctx;
+        chart.data.datasets[0].data.forEach((p,i)=>{
+          const meta=chart.getDatasetMeta(0).data[i];
+          ctx2.save();
+          ctx2.fillStyle=p.color;
+          ctx2.font="bold 11px 'DM Sans',sans-serif";
+          ctx2.textAlign='center';
+          ctx2.textBaseline='middle';
+          ctx2.fillText(p.label, meta.x, meta.y);
+          ctx2.restore();
+        });
+      }
+    }]
+  });
+
+  // Cluster cards
+  const clusterInfo = [
+    { k:'E', traits:["T° annuelle la plus haute : 26.2°C","T° min record : 22.4°C (jamais <21°C)","Insolation record : 16 337 kJ/m²/j","Saisonnalité T quasi nulle : σ=84 (6× < autres)","Précip. les plus élevées : 1 863 mm/an","Dust le plus faible : 1.1×10⁻⁷","Vent homogène : σ=0.10 m/s"] },
+    { k:'C', traits:["T° max élevée : 28.4°C","Forte saisonnalité P : 38.9","Précip. faibles : 648 mm/an","Dust élevé : 3.5×10⁻⁶","Insolation élevée : 13 582 kJ/m²/j","Vent moyen fort : 5.6 m/s"] },
+    { k:'D', traits:["Grande variabilité T : σ=2.7°C","T° min négative : -1.1°C (jusqu'à -10.8°C)","AOD le plus faible : 0.124","Précip. élevées : 921 mm","Saisonnalité T max : σT=603","Grand écart T_max - T_min : 25.2°C"] },
+    { k:'A', traits:["Précip. intermédiaires : 893 mm","Sel marin élevé : 4.2×10⁻⁵","T° modérée : 12.1°C","Forte variabilité P : σ=175 mm","Insolation modérée : 11 299 kJ/m²/j"] },
+    { k:'B', traits:["Faible saisonnalité P : 12.2","Précip. faibles : 696 mm","T° basse : 10.8°C","Sel marin intermédiaire : 3.6×10⁻⁵","Vent modéré : 3.6 m/s"] },
+  ];
+  const cg = document.getElementById('cluster-grid');
+  cg.innerHTML = '';
+  clusterInfo.forEach(cl=>{
+    const g=GROUPS[cl.k];
+    const d=document.createElement('div'); d.className='cluster-card';
+    d.style.borderLeftColor=g.color;
+    d.innerHTML=`<div style="color:${g.color};font-weight:700;margin-bottom:8px;font-size:13px">${g.label}</div>`
+      +cl.traits.map(t=>`<li>${t}</li>`).join('');
+    cg.appendChild(d);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  Chart.defaults.color = '#94a3b8';
+  Chart.defaults.font.family = "'DM Sans', sans-serif";
+
+  renderTable();
+  buildVarSelect('bp-var-sel', renderBoxplots);
+  renderBoxplots();
+  buildRadarGroupBtns();
+  renderRadar();
+  buildVarSelect('cmp-var-sel', renderComparaison);
+  buildStatPills('cmp-stat-pills', cmpStat, s => { cmpStat=s; renderComparaison(); });
+  renderComparaison();
+  renderAllVars();
+  renderPCA();
+});
+</script>
+</body>
+</html>
