@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Atmosphérique — Bora Bora</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+:root {
+  --bg:#0b0c18;--bg2:#12131f;--bg3:#1a1b2e;
+  --A:#ef4444;--B:#22c55e;--C:#38bdf8;--D:#a855f7;--E:#eab308;
+  --text:#e2e8f0;--muted:#64748b;--border:rgba(255,255,255,0.07);--accent:#eab308;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+.header{background:linear-gradient(135deg,#0b0c18,#1a1208 50%,#0b0c18);padding:22px 36px 18px;border-bottom:1px solid rgba(234,179,8,0.15);}
+.header h1{font-size:21px;font-weight:800;background:linear-gradient(90deg,#eab308,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.header p{color:var(--muted);font-size:12px;margin-top:4px;}
+/* legend groupes */
+.group-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;}
+.gl-item{display:flex;align-items:center;gap:6px;font-size:12px;}
+.gl-dot{width:10px;height:10px;border-radius:50%;}
+.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);overflow-x:auto;padding:0 36px;}
+.tab{padding:13px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;white-space:nowrap;transition:all .2s;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700;}
+.content{padding:24px 36px;}
+.panel{display:none;}
+.panel.active{display:block;}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;position:relative;}
+.card+.card{margin-top:16px;}
+.export-btn{position:absolute;top:12px;right:12px;background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);color:var(--accent);border-radius:8px;padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;z-index:10;}
+.export-btn:hover{background:rgba(234,179,8,0.25);}
+.section-title{font-size:14px;font-weight:700;color:var(--accent);margin-bottom:14px;}
+.stat-pills{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;}
+.pill{padding:4px 14px;border-radius:20px;border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;transition:all .2s;}
+.tbl-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{padding:9px 11px;text-align:left;font-weight:700;border-bottom:2px solid rgba(234,179,8,0.2);white-space:nowrap;}
+td{padding:7px 11px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px;white-space:nowrap;}
+tr:hover td{background:rgba(255,255,255,0.02);}
+td.is-max{color:#4ade80;font-weight:700;}
+td.is-min{color:#f87171;font-weight:700;}
+td.is-bb{color:#eab308;font-weight:700;}
+.legend-row{display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--muted);}
+.grid-auto{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px;}
+select{background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 11px;font-family:inherit;font-size:13px;cursor:pointer;}
+.gbtn{padding:5px 13px;border-radius:20px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;transition:all .2s;}
+.ctrl-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+.ctrl-label{color:var(--muted);font-size:13px;}
+.boxplot-grid{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-top:10px;}
+.bp-item{text-align:center;}
+.bp-name{font-size:12px;font-weight:700;margin-top:5px;}
+.bp-sub{font-size:10px;color:var(--muted);margin-top:1px;font-family:'JetBrains Mono',monospace;}
+.cluster-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:10px;margin-top:16px;}
+.cluster-card{background:var(--bg3);border-radius:10px;padding:13px;border-left:3px solid;}
+.cluster-card li{font-size:11px;color:var(--muted);margin-top:4px;list-style:none;padding-left:12px;position:relative;}
+.cluster-card li::before{content:"▸";position:absolute;left:0;}
+.vg-badge{display:inline-block;font-size:9px;padding:1px 6px;border-radius:10px;margin-left:4px;font-weight:700;vertical-align:middle;}
+/* RADAR VAR SELECTOR */
+.radar-var-panel{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;}
+.radar-var-panel h3{font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;}
+.radar-var-panel p{font-size:11px;color:var(--muted);margin-bottom:12px;}
+.var-checkboxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;}
+.var-cb-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.03);cursor:pointer;transition:background .15s;}
+.var-cb-item:hover{background:rgba(255,255,255,0.06);}
+.var-cb-item input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer;}
+.var-cb-item label{font-size:12px;cursor:pointer;color:var(--text);}
+.var-cb-item .vg{font-size:9px;color:var(--muted);margin-left:auto;}
+.radar-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.btn-sm{padding:5px 14px;border-radius:8px;border:none;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;}
+.btn-primary{background:rgba(234,179,8,0.15);border:1px solid rgba(234,179,8,0.4);color:var(--accent);}
+.btn-primary:hover{background:rgba(234,179,8,0.3);}
+.btn-secondary{background:rgba(100,116,139,0.1);border:1px solid #334155;color:#94a3b8;}
+.btn-secondary:hover{background:rgba(100,116,139,0.2);}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:#2a2b40;border-radius:3px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏝️ Dashboard Atmosphérique — Bora Bora</h1>
+  <p>5 groupes climatiques · 22 variables · MEAN / SD / MEDIAN / MIN / MAX · Groupe E = site d'étude Bora Bora</p>
+  <div class="group-legend">
+    <div class="gl-item"><div class="gl-dot" style="background:#ef4444"></div><span style="color:#ef4444">A — Océanique OUEST</span></div>
+    <div class="gl-item"><div class="gl-dot" style="background:#22c55e"></div><span style="color:#22c55e">B — Océanique NORD</span></div>
+    <div class="gl-item"><div class="gl-dot" style="background:#38bdf8"></div><span style="color:#38bdf8">C — Méditerranée</span></div>
+    <div class="gl-item"><div class="gl-dot" style="background:#a855f7"></div><span style="color:#a855f7">D — Continental</span></div>
+    <div class="gl-item"><div class="gl-dot" style="background:#eab308"></div><span style="color:#eab308">E — Bora Bora ★</span></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('tableau',this)">Tableau</button>
+  <button class="tab" onclick="switchTab('boxplots',this)">Boxplots</button>
+  <button class="tab" onclick="switchTab('radar',this)">Radar</button>
+  <button class="tab" onclick="switchTab('comparaison',this)">Comparaison</button>
+  <button class="tab" onclick="switchTab('variables',this)">Toutes Variables</button>
+  <button class="tab" onclick="switchTab('pca',this)">ACP / Clusters</button>
+</div>
+
+<div class="content">
+
+<!-- TABLEAU -->
+<div id="panel-tableau" class="panel active">
+  <div class="card" id="card-tableau">
+    <button class="export-btn" onclick="exportCard('card-tableau','tableau')">⬇ PNG</button>
+    <div class="section-title">📋 Tableau statistique comparatif</div>
+    <div class="stat-pills" id="stat-pills"></div>
+    <div class="tbl-wrap"><table id="main-table"></table></div>
+    <div class="legend-row">
+      <span><span style="color:#4ade80">■</span> Max inter-groupe</span>
+      <span><span style="color:#f87171">■</span> Min inter-groupe</span>
+      <span><span style="color:#eab308">■</span> Bora Bora (E)</span>
+    </div>
+  </div>
+</div>
+
+<!-- BOXPLOTS -->
+<div id="panel-boxplots" class="panel">
+  <div class="ctrl-row">
+    <span class="ctrl-label">Variable :</span>
+    <select id="bp-var-sel" onchange="renderBoxplots()"></select>
+  </div>
+  <div class="card" id="card-boxplots">
+    <button class="export-btn" onclick="exportCard('card-boxplots','boxplots')">⬇ PNG</button>
+    <div class="section-title" id="bp-title">📦 Boxplots</div>
+    <div class="boxplot-grid" id="boxplot-grid"></div>
+    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:10px">
+      whiskers = MIN/MAX &nbsp;│&nbsp; boîte = ±0.674σ autour médiane &nbsp;│&nbsp; ● = MEAN &nbsp;│&nbsp; barre = MEDIAN
+    </div>
+  </div>
+</div>
+
+<!-- RADAR -->
+<div id="panel-radar" class="panel">
+  <div class="ctrl-row">
+    <span class="ctrl-label">Groupes :</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;" id="radar-group-btns"></div>
+  </div>
+  <div class="radar-var-panel">
+    <h3>📌 Choisir les variables à afficher dans le radar</h3>
+    <p>Coche les variables que tu veux voir. Minimum 3 recommandé. Les valeurs sont normalisées 0–1 automatiquement.</p>
+    <div class="var-checkboxes" id="var-checkboxes"></div>
+    <div class="radar-actions">
+      <button class="btn-sm btn-primary" onclick="renderRadar()">🔄 Mettre à jour le radar</button>
+      <button class="btn-sm btn-secondary" onclick="selectAllVars()">✓ Tout cocher</button>
+      <button class="btn-sm btn-secondary" onclick="selectDefaultVars()">↺ Sélection par défaut</button>
+    </div>
+  </div>
+  <div class="card" id="card-radar">
+    <button class="export-btn" onclick="exportCard('card-radar','radar')">⬇ PNG</button>
+    <div class="section-title">🕸️ Radar — variables sélectionnées, normalisées 0–1</div>
+    <div style="max-width:700px;margin:0 auto;"><canvas id="radar-chart" height="460"></canvas></div>
+  </div>
+</div>
+
+<!-- COMPARAISON -->
+<div id="panel-comparaison" class="panel">
+  <div class="ctrl-row">
+    <span class="ctrl-label">Variable :</span>
+    <select id="cmp-var-sel" onchange="renderComparaison()"></select>
+    <span class="ctrl-label">Stat :</span>
+    <div class="stat-pills" id="cmp-stat-pills"></div>
+  </div>
+  <div class="card" id="card-comparaison">
+    <button class="export-btn" onclick="exportCard('card-comparaison','comparaison')">⬇ PNG</button>
+    <div class="section-title" id="cmp-title">📊 Comparaison inter-groupes</div>
+    <div><canvas id="cmp-chart" height="240"></canvas></div>
+  </div>
+</div>
+
+<!-- TOUTES VARIABLES -->
+<div id="panel-variables" class="panel">
+  <div class="ctrl-row">
+    <span class="ctrl-label">Stat :</span>
+    <div class="stat-pills" id="all-stat-pills"></div>
+    <button class="btn-sm btn-primary" style="margin-left:auto" onclick="exportAllCards()">⬇ Tout exporter</button>
+  </div>
+  <div class="grid-auto" id="all-vars-grid"></div>
+</div>
+
+<!-- ACP -->
+<div id="panel-pca" class="panel">
+  <div class="card" id="card-pca">
+    <button class="export-btn" onclick="exportCard('card-pca','pca')">⬇ PNG</button>
+    <div class="section-title">🔬 ACP simplifiée — positionnement climatique</div>
+    <div style="color:var(--muted);font-size:12px;margin-bottom:12px">PC1 ≈ gradient thermique + insolation (~42%) &nbsp;·&nbsp; PC2 ≈ aérosols + humidité (~28%)</div>
+    <div style="max-width:680px;margin:0 auto;"><canvas id="pca-chart" height="380"></canvas></div>
+  </div>
+  <div class="cluster-grid" id="cluster-grid"></div>
+</div>
+
+</div><!-- /content -->
+
+<script>
+// ═══════════════════════════════
+//  GROUPES & COULEURS
+// ═══════════════════════════════
+const GROUPS={
+  A:{label:"Océanique OUEST",short:"Oc.OUEST",color:"#ef4444"},
+  B:{label:"Océanique NORD", short:"Oc.NORD", color:"#22c55e"},
+  C:{label:"Méditerranée",   short:"Méditer.", color:"#38bdf8"},
+  D:{label:"Continental",    short:"Continen.",color:"#a855f7"},
+  E:{label:"Bora Bora",      short:"BoraBora", color:"#eab308"},
+};
+const GK=Object.keys(GROUPS);
+
+// ═══════════════════════════════
+//  VARIABLES
+// ═══════════════════════════════
+const VARS=[
+  {key:"_P_seasonm",   label:"P. saisonnalité",        unit:"CV",       fmt:"2", group:"Climat",   desc:"Saisonnalité des précipitations (écart-type / moyenne)"},
+  {key:"_T_seasonm",   label:"T. saisonnalité",         unit:"",         fmt:"1", group:"Climat",   desc:"Saisonnalité de la température (écart-type × 100)"},
+  {key:"_P_yearlym",   label:"P. annuelle",              unit:"mm",       fmt:"1", group:"Climat",   desc:"Moyenne annuelle des précipitations"},
+  {key:"_T_yearlym",   label:"T. annuelle",              unit:"°C",       fmt:"2", group:"Climat",   desc:"Moyenne annuelle de la température"},
+  {key:"_T_maxmean",   label:"T. max",                   unit:"°C",       fmt:"2", group:"Climat",   desc:"Température maximale du mois le plus chaud"},
+  {key:"_T_minmean",   label:"T. min",                   unit:"°C",       fmt:"2", group:"Climat",   desc:"Température minimale du mois le moins chaud"},
+  {key:"_solarmean",   label:"Radiation solaire",        unit:"kJ/m²/j",  fmt:"0", group:"Climat",   desc:"Radiation solaire moyenne"},
+  {key:"_windmean",    label:"Vent",                     unit:"m/s",      fmt:"3", group:"Climat",   desc:"Vitesse du vent moyenne"},
+  {key:"aermssbchphil",label:"BC hydrophile",            unit:"kg/m²",    fmt:"e", group:"Aérosols", desc:"Vertically integrated mass of hydrophilic black carbon aerosol"},
+  {key:"aermssbchphob",label:"BC hydrophobe",            unit:"kg/m²",    fmt:"e", group:"Aérosols", desc:"Vertically integrated mass of hydrophobic black carbon aerosol"},
+  {key:"aermssdul",    label:"Dust 9–20 µm",             unit:"kg/m²",    fmt:"e", group:"Aérosols", desc:"Vertically integrated mass of dust aerosol (9–20 µm)"},
+  {key:"aermssdum",    label:"Dust 0.55–9 µm",           unit:"kg/m²",    fmt:"e", group:"Aérosols", desc:"Vertically integrated mass of dust aerosol (0.55–9 µm)"},
+  {key:"aermssdus",    label:"Dust 0.03–0.55 µm",        unit:"kg/m²",    fmt:"e", group:"Aérosols", desc:"Vertically integrated mass of dust aerosol (0.03–0.55 µm)"},
+  {key:"aermssomhphil",label:"OM hydrophile",            unit:"kg/m²",    fmt:"e", group:"Aérosols", desc:"Vertically integrated mass of hydrophilic organic matter aerosol"},
+  {key:"aermssomhphob",label:"OM hydrophobe",            unit:"kg/m²",    fmt:"e", group:"Aérosols", desc:"Vertically integrated mass of hydrophobic organic matter aerosol"},
+  {key:"aermssso2",    label:"SO₂",                      unit:"kg/m²",    fmt:"e", group:"Aérosols", desc:"Vertically integrated mass of sulphur dioxide"},
+  {key:"aermssssl",    label:"Sea salt 5–20 µm",         unit:"kg/m²",    fmt:"e", group:"Aérosols", desc:"Vertically integrated mass of sea salt aerosol (5–20 µm)"},
+  {key:"aermssssm",    label:"Sea salt 0.5–5 µm",        unit:"kg/m²",    fmt:"e", group:"Aérosols", desc:"Vertically integrated mass of sea salt aerosol (0.5–5 µm)"},
+  {key:"aermsssss",    label:"Sea salt 0.03–0.5 µm",     unit:"kg/m²",    fmt:"e", group:"Aérosols", desc:"Vertically integrated mass of sea salt aerosol (0.03–0.5 µm)"},
+  {key:"aermsssu",     label:"Sulfate",                  unit:"kg/m²",    fmt:"e", group:"Aérosols", desc:"Vertically integrated mass of sulphate aerosol"},
+  {key:"tcw",          label:"Total column water",       unit:"kg/m²",    fmt:"2", group:"Eau",      desc:"Total column water"},
+  {key:"tcwv",         label:"Water vapour",             unit:"kg/m²",    fmt:"2", group:"Eau",      desc:"Total column water vapour"},
+];
+
+const GROUP_COLORS={Climat:"#38bdf8",Aérosols:"#fb923c",Eau:"#4ade80"};
+const DEFAULT_RADAR_VARS=["_P_seasonm","_T_seasonm","_P_yearlym","_T_yearlym","_T_maxmean","_T_minmean","_solarmean","_windmean"];
+
+// ═══════════════════════════════
+//  DONNÉES
+// ═══════════════════════════════
+const DATA={
+  A:{
+    MEAN: {_P_seasonm:22.867,_T_seasonm:491.662,_P_yearlym:892.715,_T_yearlym:12.107,_T_maxmean:24.118,_T_minmean:2.730,_solarmean:11299.0,_windmean:3.742,aermssbchphil:1.422e-7,aermssbchphob:6.282e-7,aermssdul:1.160e-5,aermssdum:4.494e-6,aermssdus:1.940e-6,aermssomhphil:2.297e-6,aermssomhphob:1.085e-5,aermssso2:8.913e-7,aermssssl:1.774e-5,aermssssm:4.577e-5,aermsssss:5.451e-7,aermsssu:4.167e-6,tcw:15.159,tcwv:15.003},
+    SD:   {_P_seasonm:5.319,_T_seasonm:47.631,_P_yearlym:174.653,_T_yearlym:0.814,_T_maxmean:1.664,_T_minmean:1.044,_solarmean:514.6,_windmean:0.969,aermssbchphil:5.44e-8,aermssbchphob:4.80e-7,aermssdul:8.31e-6,aermssdum:2.70e-6,aermssdus:1.11e-6,aermssomhphil:8.03e-7,aermssomhphob:6.60e-6,aermssso2:1.34e-7,aermssssl:1.068e-5,aermssssm:1.555e-5,aermsssss:1.80e-7,aermsssu:1.435e-6,tcw:6.434,tcwv:6.441},
+    MEDIAN:{_P_seasonm:22.276,_T_seasonm:498.484,_P_yearlym:824.5,_T_yearlym:12.006,_T_maxmean:24.5,_T_minmean:2.600,_solarmean:11360.1,_windmean:3.653,aermssbchphil:1.325e-7,aermssbchphob:5.442e-7,aermssdul:1.128e-5,aermssdum:4.423e-6,aermssdus:1.905e-6,aermssomhphil:2.107e-6,aermssomhphob:1.054e-5,aermssso2:8.990e-7,aermssssl:1.823e-5,aermssssm:4.848e-5,aermsssss:5.791e-7,aermsssu:4.324e-6,tcw:13.435,tcwv:13.277},
+    MIN:  {_P_seasonm:12.182,_T_seasonm:332.943,_P_yearlym:685.025,_T_yearlym:10.053,_T_maxmean:19.526,_T_minmean:1.094,_solarmean:9800.5,_windmean:2.275,aermssbchphil:5.91e-8,aermssbchphob:1.016e-7,aermssdul:3.50e-7,aermssdum:3.20e-7,aermssdus:1.73e-7,aermssomhphil:9.92e-7,aermssomhphob:2.19e-6,aermssso2:6.54e-7,aermssssl:3.08e-6,aermssssm:2.045e-5,aermsssss:2.52e-7,aermsssu:1.496e-6,tcw:7.529,tcwv:7.375},
+    MAX:  {_P_seasonm:37.258,_T_seasonm:575.286,_P_yearlym:1446.25,_T_yearlym:14.186,_T_maxmean:27.200,_T_minmean:5.637,_solarmean:12589.0,_windmean:6.856,aermssbchphil:3.508e-7,aermssbchphob:2.393e-6,aermssdul:3.001e-5,aermssdum:1.086e-5,aermssdus:4.681e-6,aermssomhphil:4.701e-6,aermssomhphob:3.151e-5,aermssso2:1.195e-6,aermssssl:3.949e-5,aermssssm:7.413e-5,aermsssss:8.727e-7,aermsssu:6.960e-6,tcw:27.607,tcwv:27.463},
+  },
+  B:{
+    MEAN: {_P_seasonm:12.217,_T_seasonm:569.139,_P_yearlym:695.745,_T_yearlym:10.815,_T_maxmean:24.376,_T_minmean:0.671,_solarmean:10635.5,_windmean:3.648,aermssbchphil:1.268e-7,aermssbchphob:5.629e-7,aermssdul:5.897e-6,aermssdum:3.331e-6,aermssdus:1.471e-6,aermssomhphil:2.289e-6,aermssomhphob:1.024e-5,aermssso2:7.450e-7,aermssssl:1.095e-5,aermssssm:4.864e-5,aermsssss:5.794e-7,aermsssu:3.395e-6,tcw:17.682,tcwv:17.506},
+    SD:   {_P_seasonm:2.476,_T_seasonm:33.361,_P_yearlym:61.498,_T_yearlym:0.641,_T_maxmean:1.042,_T_minmean:0.925,_solarmean:449.2,_windmean:0.431,aermssbchphil:4.80e-8,aermssbchphob:5.438e-7,aermssdul:7.063e-6,aermssdum:3.267e-6,aermssdus:1.416e-6,aermssomhphil:7.329e-7,aermssomhphob:6.658e-6,aermssso2:1.583e-7,aermssssl:8.702e-6,aermssssm:1.761e-5,aermsssss:2.050e-7,aermsssu:1.859e-6,tcw:5.536,tcwv:5.551},
+    MEDIAN:{_P_seasonm:11.957,_T_seasonm:567.292,_P_yearlym:690.820,_T_yearlym:10.848,_T_maxmean:24.700,_T_minmean:0.600,_solarmean:10669.5,_windmean:3.601,aermssbchphil:1.345e-7,aermssbchphob:4.320e-7,aermssdul:3.622e-6,aermssdum:2.193e-6,aermssdus:1.017e-6,aermssomhphil:2.304e-6,aermssomhphob:9.631e-6,aermssso2:7.413e-7,aermssssl:8.179e-6,aermssssm:4.511e-5,aermsssss:5.437e-7,aermsssu:3.242e-6,tcw:15.975,tcwv:15.828},
+    MIN:  {_P_seasonm:8.032,_T_seasonm:457.757,_P_yearlym:584.791,_T_yearlym:8.535,_T_maxmean:20.685,_T_minmean:-2.0,_solarmean:9517.4,_windmean:2.642,aermssbchphil:4.93e-8,aermssbchphob:4.89e-8,aermssdul:1.41e-8,aermssdum:2.87e-8,aermssdus:1.45e-8,aermssomhphil:9.98e-7,aermssomhphob:1.617e-6,aermssso2:4.64e-7,aermssssl:9.42e-7,aermssssm:1.968e-5,aermsssss:2.40e-7,aermsssu:7.40e-7,tcw:8.193,tcwv:8.053},
+    MAX:  {_P_seasonm:27.908,_T_seasonm:670.898,_P_yearlym:954.670,_T_yearlym:11.835,_T_maxmean:26.797,_T_minmean:2.935,_solarmean:11233.6,_windmean:6.133,aermssbchphil:2.705e-7,aermssbchphob:3.243e-6,aermssdul:3.684e-5,aermssdum:1.522e-5,aermssdus:6.457e-6,aermssomhphil:4.276e-6,aermssomhphob:3.415e-5,aermssso2:1.101e-6,aermssssl:3.712e-5,aermssssm:9.596e-5,aermsssss:1.129e-6,aermsssu:9.058e-6,tcw:28.644,tcwv:28.509},
+  },
+  C:{
+    MEAN: {_P_seasonm:38.912,_T_seasonm:597.127,_P_yearlym:647.937,_T_yearlym:15.017,_T_maxmean:28.400,_T_minmean:3.866,_solarmean:13582.4,_windmean:5.558,aermssbchphil:1.100e-7,aermssbchphob:5.210e-7,aermssdul:2.028e-5,aermssdum:9.387e-6,aermssdus:4.086e-6,aermssomhphil:1.876e-6,aermssomhphob:1.013e-5,aermssso2:1.024e-6,aermssssl:6.835e-6,aermssssm:3.315e-5,aermsssss:3.981e-7,aermsssu:4.843e-6,tcw:19.393,tcwv:19.313},
+    SD:   {_P_seasonm:3.546,_T_seasonm:26.506,_P_yearlym:62.721,_T_yearlym:0.645,_T_maxmean:0.884,_T_minmean:1.009,_solarmean:289.1,_windmean:0.694,aermssbchphil:3.72e-8,aermssbchphob:4.118e-7,aermssdul:2.021e-5,aermssdum:8.445e-6,aermssdus:3.643e-6,aermssomhphil:6.534e-7,aermssomhphob:5.471e-6,aermssso2:2.160e-7,aermssssl:5.185e-6,aermssssm:1.331e-5,aermsssss:1.554e-7,aermsssu:2.205e-6,tcw:6.183,tcwv:6.195},
+    MEDIAN:{_P_seasonm:39.318,_T_seasonm:604.317,_P_yearlym:656.143,_T_yearlym:15.024,_T_maxmean:28.400,_T_minmean:3.700,_solarmean:13584.4,_windmean:5.836,aermssbchphil:1.103e-7,aermssbchphob:4.685e-7,aermssdul:1.555e-5,aermssdum:8.209e-6,aermssdus:3.586e-6,aermssomhphil:1.765e-6,aermssomhphob:9.901e-6,aermssso2:1.033e-6,aermssssl:5.504e-6,aermssssm:3.176e-5,aermsssss:3.815e-7,aermsssu:4.814e-6,tcw:17.818,tcwv:17.770},
+    MIN:  {_P_seasonm:25.245,_T_seasonm:495.333,_P_yearlym:479.232,_T_yearlym:11.631,_T_maxmean:23.241,_T_minmean:0.524,_solarmean:12694.2,_windmean:3.25,aermssbchphil:3.956e-8,aermssbchphob:6.963e-8,aermssdul:4.31e-8,aermssdum:1.44e-7,aermssdus:7.38e-8,aermssomhphil:7.858e-7,aermssomhphob:1.781e-6,aermssso2:6.013e-7,aermssssl:6.533e-7,aermssssm:1.109e-5,aermsssss:1.374e-7,aermsssu:1.132e-6,tcw:9.215,tcwv:9.186},
+    MAX:  {_P_seasonm:50.375,_T_seasonm:672.151,_P_yearlym:849.0,_T_yearlym:17.260,_T_maxmean:30.548,_T_minmean:7.159,_solarmean:14324.2,_windmean:6.206,aermssbchphil:2.311e-7,aermssbchphob:2.484e-6,aermssdul:8.175e-5,aermssdum:3.813e-5,aermssdus:1.664e-5,aermssomhphil:5.237e-6,aermssomhphob:2.597e-5,aermssso2:1.582e-6,aermssssl:2.279e-5,aermssssm:7.580e-5,aermsssss:8.963e-7,aermsssu:9.918e-6,tcw:30.312,tcwv:30.254},
+  },
+  D:{
+    MEAN: {_P_seasonm:17.040,_T_seasonm:602.675,_P_yearlym:921.124,_T_yearlym:9.911,_T_maxmean:24.112,_T_minmean:-1.127,_solarmean:11864.0,_windmean:3.331,aermssbchphil:1.458e-7,aermssbchphob:5.681e-7,aermssdul:4.056e-5,aermssdum:1.379e-5,aermssdus:5.878e-6,aermssomhphil:2.209e-6,aermssomhphob:1.066e-5,aermssso2:1.103e-6,aermssssl:1.345e-5,aermssssm:3.695e-5,aermsssss:4.417e-7,aermsssu:5.717e-6,tcw:15.423,tcwv:15.286},
+    SD:   {_P_seasonm:4.834,_T_seasonm:37.211,_P_yearlym:204.245,_T_yearlym:2.684,_T_maxmean:2.697,_T_minmean:2.555,_solarmean:752.7,_windmean:0.783,aermssbchphil:4.79e-8,aermssbchphob:2.880e-7,aermssdul:2.765e-5,aermssdum:7.906e-6,aermssdus:3.162e-6,aermssomhphil:7.543e-7,aermssomhphob:4.604e-6,aermssso2:2.262e-7,aermssssl:9.033e-6,aermssssm:1.327e-5,aermsssss:1.536e-7,aermsssu:1.647e-6,tcw:6.937,tcwv:6.938},
+    MEDIAN:{_P_seasonm:15.513,_T_seasonm:600.539,_P_yearlym:866.585,_T_yearlym:10.706,_T_maxmean:24.702,_T_minmean:-0.394,_solarmean:11677.2,_windmean:3.063,aermssbchphil:1.309e-7,aermssbchphob:5.666e-7,aermssdul:3.932e-5,aermssdum:1.356e-5,aermssdus:5.636e-6,aermssomhphil:1.938e-6,aermssomhphob:1.105e-5,aermssso2:1.092e-6,aermssssl:1.205e-5,aermssssm:3.674e-5,aermsssss:4.407e-7,aermsssu:5.918e-6,tcw:13.614,tcwv:13.471},
+    MIN:  {_P_seasonm:8.199,_T_seasonm:506.613,_P_yearlym:582.677,_T_yearlym:-1.382,_T_maxmean:11.597,_T_minmean:-10.802,_solarmean:10617.1,_windmean:1.775,aermssbchphil:8.192e-8,aermssbchphob:1.463e-7,aermssdul:1.657e-6,aermssdum:1.477e-6,aermssdus:8.130e-7,aermssomhphil:1.166e-6,aermssomhphob:3.202e-6,aermssso2:7.576e-7,aermssssl:1.940e-6,aermssssm:1.774e-5,aermsssss:2.189e-7,aermsssu:2.295e-6,tcw:6.856,tcwv:6.722},
+    MAX:  {_P_seasonm:36.930,_T_seasonm:698.263,_P_yearlym:1619.184,_T_yearlym:14.121,_T_maxmean:29.300,_T_minmean:3.370,_solarmean:14245.4,_windmean:7.520,aermssbchphil:2.857e-7,aermssbchphob:1.788e-6,aermssdul:9.691e-5,aermssdum:3.147e-5,aermssdus:1.341e-5,aermssomhphil:4.264e-6,aermssomhphob:2.377e-5,aermssso2:1.658e-6,aermssssl:3.460e-5,aermssssm:6.290e-5,aermsssss:7.415e-7,aermsssu:9.467e-6,tcw:29.436,tcwv:29.307},
+  },
+  E:{
+    MEAN: {_P_seasonm:40.597,_T_seasonm:84.069,_P_yearlym:1862.931,_T_yearlym:26.158,_T_maxmean:30.052,_T_minmean:22.352,_solarmean:16337.1,_windmean:4.630,aermssbchphil:4.419e-9,aermssbchphob:2.370e-7,aermssdul:1.085e-7,aermssdum:1.950e-7,aermssdus:1.243e-7,aermssomhphil:1.577e-7,aermssomhphob:4.282e-6,aermssso2:5.281e-8,aermssssl:1.567e-5,aermssssm:1.031e-4,aermsssss:1.272e-6,aermsssu:2.520e-6,tcw:42.324,tcwv:42.206},
+    SD:   {_P_seasonm:1.777,_T_seasonm:1.071,_P_yearlym:42.009,_T_yearlym:0.365,_T_maxmean:0.356,_T_minmean:0.377,_solarmean:404.5,_windmean:0.103,aermssbchphil:4.20e-9,aermssbchphob:1.395e-7,aermssdul:1.285e-7,aermssdum:8.181e-8,aermssdus:5.628e-8,aermssomhphil:5.634e-8,aermssomhphob:1.852e-6,aermssso2:1.636e-8,aermssssl:5.782e-6,aermssssm:1.930e-5,aermsssss:2.344e-7,aermsssu:8.318e-7,tcw:5.976,tcwv:5.918},
+    MEDIAN:{_P_seasonm:40.372,_T_seasonm:84.059,_P_yearlym:1888.0,_T_yearlym:26.208,_T_maxmean:30.200,_T_minmean:22.400,_solarmean:16494.4,_windmean:4.600,aermssbchphil:3.356e-9,aermssbchphob:2.069e-7,aermssdul:5.645e-8,aermssdum:1.911e-7,aermssdus:1.146e-7,aermssomhphil:1.465e-7,aermssomhphob:3.747e-6,aermssso2:5.047e-8,aermssssl:1.496e-5,aermssssm:1.046e-4,aermsssss:1.294e-6,aermsssu:2.358e-6,tcw:42.096,tcwv:42.018},
+    MIN:  {_P_seasonm:37.369,_T_seasonm:81.613,_P_yearlym:1781.0,_T_yearlym:25.204,_T_maxmean:29.100,_T_minmean:21.400,_solarmean:15486.7,_windmean:4.533,aermssbchphil:1.122e-9,aermssbchphob:5.956e-8,aermssdul:9.283e-9,aermssdum:4.800e-8,aermssdus:3.151e-8,aermssomhphil:8.425e-8,aermssomhphob:1.651e-6,aermssso2:2.461e-8,aermssssl:5.626e-6,aermssssm:5.479e-5,aermsssss:6.839e-7,aermsssu:1.369e-6,tcw:31.252,tcwv:31.176},
+    MAX:  {_P_seasonm:44.005,_T_seasonm:85.850,_P_yearlym:1903.0,_T_yearlym:26.675,_T_maxmean:30.500,_T_minmean:22.900,_solarmean:16871.5,_windmean:4.892,aermssbchphil:3.624e-8,aermssbchphob:1.039e-6,aermssdul:6.983e-7,aermssdum:4.275e-7,aermssdus:3.186e-7,aermssomhphil:3.447e-7,aermssomhphob:1.029e-5,aermssso2:1.076e-7,aermssssl:3.836e-5,aermssssm:1.461e-4,aermsssss:1.781e-6,aermsssu:6.333e-6,tcw:54.170,tcwv:53.780},
+  },
+};
+
+const STATS=["MEAN","SD","MEDIAN","MIN","MAX"];
+let currentStat="MEAN", cmpStat="MEAN", allStat="MEAN";
+let radarGroups=[...GK];
+let selectedRadarVars=new Set(DEFAULT_RADAR_VARS);
+let charts={};
+
+// ═══ Helpers ═══
+function fmt(v,f){
+  if(v===null||v===undefined)return"—";
+  if(f==="e")return v.toExponential(3);
+  return v.toFixed(parseInt(f));
+}
+function hexA(hex,a){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return`rgba(${r},${g},${b},${a})`;
+}
+function normAuto(val,key){
+  const all=GK.map(g=>DATA[g].MEAN[key]);
+  const mn=Math.min(...all),mx=Math.max(...all);
+  return mx===mn?0.5:(val-mn)/(mx-mn);
+}
+
+// ═══ Tabs ═══
+function switchTab(name,btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-'+name).classList.add('active');
+}
+
+// ═══ Export ═══
+function exportCard(id,name){
+  html2canvas(document.getElementById(id),{backgroundColor:'#12131f',scale:2,useCORS:true}).then(c=>{
+    const a=document.createElement('a');a.download=`borabora_${name}.png`;a.href=c.toDataURL('image/png');a.click();
+  });
+}
+function exportAllCards(){
+  document.querySelectorAll('#all-vars-grid .card').forEach((card,i)=>{
+    setTimeout(()=>{
+      html2canvas(card,{backgroundColor:'#12131f',scale:2}).then(c=>{
+        const a=document.createElement('a');a.download=`borabora_var_${i+1}.png`;a.href=c.toDataURL('image/png');a.click();
+      });
+    },i*300);
+  });
+}
+
+// ═══ Stat pills ═══
+function buildStatPills(cid,cur,cb){
+  const el=document.getElementById(cid);el.innerHTML='';
+  STATS.forEach(s=>{
+    const b=document.createElement('button');b.className='pill';b.textContent=s;
+    b.style.background=s===cur?'#eab308':'rgba(255,255,255,0.07)';
+    b.style.color=s===cur?'#0b0c18':'#94a3b8';
+    b.onclick=()=>cb(s);
+    el.appendChild(b);
+  });
+}
+
+// ═══════ TABLEAU ═══════
+function renderTable(){
+  buildStatPills('stat-pills',currentStat,s=>{currentStat=s;renderTable();});
+  const tbl=document.getElementById('main-table');
+  let h='<thead><tr><th style="color:#eab308">Variable</th><th style="color:#475569;font-size:10px">Groupe</th><th style="color:#475569;font-size:10px">Unité</th>';
+  GK.forEach(k=>{h+=`<th style="color:${GROUPS[k].color}">${GROUPS[k].short}</th>`;});
+  h+='</tr></thead><tbody>';
+  VARS.forEach(v=>{
+    const vals=GK.map(k=>DATA[k][currentStat][v.key]);
+    const mx=Math.max(...vals),mn=Math.min(...vals);
+    const gc=GROUP_COLORS[v.group]||'#64748b';
+    h+=`<tr><td style="color:#e2e8f0;font-weight:600;font-family:'DM Sans',sans-serif" title="${v.desc}">${v.label}</td>`;
+    h+=`<td><span class="vg-badge" style="background:${hexA(gc,0.2)};color:${gc}">${v.group}</span></td>`;
+    h+=`<td style="color:#475569;font-size:10px">${v.unit||'—'}</td>`;
+    GK.forEach((k,j)=>{
+      const val=vals[j];
+      let cls=k==='E'?'is-bb':(val===mx&&val!==mn?'is-max':(val===mn&&val!==mx?'is-min':''));
+      h+=`<td class="${cls}">${fmt(val,v.fmt)}</td>`;
+    });
+    h+='</tr>';
+  });
+  tbl.innerHTML=h+'</tbody>';
+}
+
+// ═══════ BOXPLOTS ═══════
+function buildVarSelect(id){
+  const sel=document.getElementById(id);sel.innerHTML='';
+  VARS.forEach(v=>{const o=document.createElement('option');o.value=v.key;o.text=v.label+(v.unit?` (${v.unit})`:'');sel.appendChild(o);});
+  sel.value='_T_yearlym';
+}
+function renderBoxplots(){
+  const key=document.getElementById('bp-var-sel').value;
+  const vInfo=VARS.find(v=>v.key===key);
+  document.getElementById('bp-title').textContent=`📦 Boxplots — ${vInfo.label}${vInfo.unit?' ('+vInfo.unit+')':''}`;
+  const grid=document.getElementById('boxplot-grid');grid.innerHTML='';
+  const allV=GK.flatMap(k=>[DATA[k].MIN[key],DATA[k].MAX[key]]);
+  const yMin=Math.min(...allV),yMax=Math.max(...allV);
+  const range=yMax-yMin||1;
+  const H=240,PAD=22;
+  const toY=v=>PAD+(1-(v-yMin)/range)*(H-PAD*2);
+  GK.forEach(k=>{
+    const g=GROUPS[k];
+    const mn=DATA[k].MIN[key],mx=DATA[k].MAX[key];
+    const med=DATA[k].MEDIAN[key],mean=DATA[k].MEAN[key],sd=DATA[k].SD[key];
+    const q1=med-sd*0.674,q3=med+sd*0.674;
+    const yMx=toY(mx),yMn=toY(mn),yMed=toY(med),yMean=toY(mean);
+    const yQ1=toY(q1),yQ3=toY(q3);
+    const boxT=Math.min(yQ1,yQ3),boxH=Math.max(Math.abs(yQ3-yQ1),2);
+    const item=document.createElement('div');item.className='bp-item';
+    item.innerHTML=`<svg width="80" height="${H}" style="overflow:visible">
+      <line x1="40" y1="${yMx}" x2="40" y2="${yMn}" stroke="${g.color}" stroke-width="1.5" stroke-dasharray="3,2"/>
+      <line x1="27" y1="${yMx}" x2="53" y2="${yMx}" stroke="${g.color}" stroke-width="2"/>
+      <line x1="27" y1="${yMn}" x2="53" y2="${yMn}" stroke="${g.color}" stroke-width="2"/>
+      <rect x="15" y="${boxT}" width="50" height="${boxH}" fill="${hexA(g.color,.2)}" stroke="${g.color}" stroke-width="1.5" rx="3"/>
+      <line x1="15" y1="${yMed}" x2="65" y2="${yMed}" stroke="${g.color}" stroke-width="3"/>
+      <circle cx="40" cy="${yMean}" r="5" fill="${g.color}" stroke="#0b0c18" stroke-width="1.5"/>
+      <text x="40" y="${yMx-7}" text-anchor="middle" fill="#64748b" font-size="9">${fmt(mx,vInfo.fmt)}</text>
+      <text x="40" y="${yMn+15}" text-anchor="middle" fill="#64748b" font-size="9">${fmt(mn,vInfo.fmt)}</text>
+    </svg>
+    <div class="bp-name" style="color:${g.color}">${g.short}</div>
+    <div class="bp-sub">μ=${fmt(mean,vInfo.fmt)}</div>
+    <div class="bp-sub">σ=${fmt(sd,vInfo.fmt)}</div>
+    <div class="bp-sub">med=${fmt(med,vInfo.fmt)}</div>`;
+    grid.appendChild(item);
+  });
+}
+
+// ═══════ RADAR ═══════
+function buildRadarGroupBtns(){
+  const wrap=document.getElementById('radar-group-btns');wrap.innerHTML='';
+  GK.forEach(k=>{
+    const b=document.createElement('button');b.className='gbtn';
+    b.textContent=GROUPS[k].short;
+    b.style.border=`2px solid ${GROUPS[k].color}`;
+    b.style.background=radarGroups.includes(k)?GROUPS[k].color:'transparent';
+    b.style.color=radarGroups.includes(k)?'#0b0c18':GROUPS[k].color;
+    b.onclick=()=>{
+      if(radarGroups.includes(k)){if(radarGroups.length>1)radarGroups=radarGroups.filter(x=>x!==k);}
+      else radarGroups.push(k);
+      buildRadarGroupBtns();renderRadar();
+    };
+    wrap.appendChild(b);
+  });
+}
+
+function buildVarCheckboxes(){
+  const wrap=document.getElementById('var-checkboxes');wrap.innerHTML='';
+  VARS.forEach(v=>{
+    const gc=GROUP_COLORS[v.group]||'#64748b';
+    const item=document.createElement('label');item.className='var-cb-item';
+    item.innerHTML=`<input type="checkbox" id="cb_${v.key}" ${selectedRadarVars.has(v.key)?'checked':''}>
+      <span style="flex:1">${v.label}${v.unit?` <span style="color:#475569;font-size:10px">(${v.unit})</span>`:''}</span>
+      <span class="vg" style="background:${hexA(gc,.2)};color:${gc};padding:1px 5px;border-radius:8px;font-size:9px">${v.group}</span>`;
+    wrap.appendChild(item);
+  });
+}
+
+function selectAllVars(){
+  VARS.forEach(v=>{selectedRadarVars.add(v.key);document.getElementById('cb_'+v.key).checked=true;});
+}
+function selectDefaultVars(){
+  VARS.forEach(v=>{
+    const isDefault=DEFAULT_RADAR_VARS.includes(v.key);
+    if(isDefault)selectedRadarVars.add(v.key);else selectedRadarVars.delete(v.key);
+    document.getElementById('cb_'+v.key).checked=isDefault;
+  });
+  renderRadar();
+}
+function getCheckedVars(){
+  return VARS.filter(v=>document.getElementById('cb_'+v.key)?.checked);
+}
+
+function renderRadar(){
+  // Sync selectedRadarVars avec les checkboxes
+  VARS.forEach(v=>{
+    if(document.getElementById('cb_'+v.key)?.checked) selectedRadarVars.add(v.key);
+    else selectedRadarVars.delete(v.key);
+  });
+  const activeVars=VARS.filter(v=>selectedRadarVars.has(v.key));
+  if(activeVars.length<2)return;
+  if(charts.radar)charts.radar.destroy();
+  const labels=activeVars.map(v=>v.label);
+  const datasets=radarGroups.map(k=>({
+    label:GROUPS[k].short,
+    data:activeVars.map(v=>normAuto(DATA[k].MEAN[v.key],v.key)),
+    borderColor:GROUPS[k].color,
+    backgroundColor:hexA(GROUPS[k].color,0.1),
+    borderWidth:k==='E'?3:1.5,
+    pointBackgroundColor:GROUPS[k].color,
+    pointRadius:k==='E'?5:2.5,
+  }));
+  charts.radar=new Chart(document.getElementById('radar-chart'),{
+    type:'radar',data:{labels,datasets},
+    options:{responsive:true,maintainAspectRatio:true,
+      scales:{r:{min:0,max:1,grid:{color:'rgba(255,255,255,0.07)'},angleLines:{color:'rgba(255,255,255,0.07)'},
+        ticks:{display:false},pointLabels:{color:'#94a3b8',font:{size:11,family:"'DM Sans'"}}}},
+      plugins:{legend:{labels:{color:'#94a3b8',font:{size:12}}}}}
+  });
+}
+
+// ═══════ COMPARAISON ═══════
+function renderComparaison(){
+  buildStatPills('cmp-stat-pills',cmpStat,s=>{cmpStat=s;renderComparaison();});
+  if(charts.cmp)charts.cmp.destroy();
+  const key=document.getElementById('cmp-var-sel').value;
+  const vInfo=VARS.find(v=>v.key===key);
+  document.getElementById('cmp-title').textContent=`📊 ${vInfo.label}${vInfo.unit?' ('+vInfo.unit+')':''} — ${cmpStat}`;
+  const vals=GK.map(k=>DATA[k][cmpStat][key]);
+  charts.cmp=new Chart(document.getElementById('cmp-chart'),{
+    type:'bar',
+    data:{labels:GK.map(k=>GROUPS[k].short),
+      datasets:[{data:vals,backgroundColor:GK.map(k=>hexA(GROUPS[k].color,k==='E'?0.9:0.6)),
+        borderColor:GK.map(k=>GROUPS[k].color),borderWidth:2,borderRadius:8}]},
+    options:{responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>`${fmt(ctx.raw,vInfo.fmt)}${vInfo.unit?' '+vInfo.unit:''}`},
+          backgroundColor:'#1a1b2e',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#e2e8f0',bodyColor:'#94a3b8'}},
+      scales:{x:{grid:{display:false},ticks:{color:'#64748b'}},
+        y:{grid:{color:'rgba(255,255,255,0.05)'},
+          ticks:{color:'#64748b',callback:v=>vInfo.fmt==='e'?v.toExponential(1):v}}}}
+  });
+}
+
+// ═══════ TOUTES VARIABLES ═══════
+function renderAllVars(){
+  buildStatPills('all-stat-pills',allStat,s=>{allStat=s;renderAllVars();});
+  Object.keys(charts).filter(k=>k.startsWith('all_')).forEach(k=>{charts[k].destroy();delete charts[k];});
+  const grid=document.getElementById('all-vars-grid');grid.innerHTML='';
+  VARS.forEach((v,i)=>{
+    const cardId=`all-card-${i}`,canvasId=`all-canvas-${i}`;
+    const gc=GROUP_COLORS[v.group]||'#64748b';
+    const card=document.createElement('div');card.className='card';card.id=cardId;
+    card.innerHTML=`<button class="export-btn" onclick="exportCard('${cardId}','var_${v.key}')">⬇ PNG</button>
+      <div style="font-weight:700;color:#e2e8f0;font-size:12px;margin-bottom:2px">${v.label}
+        <span class="vg-badge" style="background:${hexA(gc,.2)};color:${gc}">${v.group}</span></div>
+      <div style="color:#475569;font-size:10px;margin-bottom:2px;line-height:1.3">${v.desc}</div>
+      <div style="color:#64748b;font-size:10px;margin-bottom:10px">${allStat}${v.unit?' — '+v.unit:''}</div>
+      <canvas id="${canvasId}" height="150"></canvas>`;
+    grid.appendChild(card);
+    setTimeout(()=>{
+      const vals=GK.map(k=>DATA[k][allStat][v.key]);
+      charts['all_'+i]=new Chart(document.getElementById(canvasId),{
+        type:'bar',
+        data:{labels:GK.map(k=>GROUPS[k].short),
+          datasets:[{data:vals,backgroundColor:GK.map(k=>hexA(GROUPS[k].color,k==='E'?.9:.55)),
+            borderColor:GK.map(k=>GROUPS[k].color),borderWidth:1.5,borderRadius:6}]},
+        options:{responsive:true,maintainAspectRatio:true,
+          plugins:{legend:{display:false},
+            tooltip:{callbacks:{label:ctx=>`${fmt(ctx.raw,v.fmt)}${v.unit?' '+v.unit:''}`},
+              backgroundColor:'#1a1b2e',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#e2e8f0',bodyColor:'#94a3b8'}},
+          scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:10}}},
+            y:{grid:{color:'rgba(255,255,255,0.04)'},
+              ticks:{color:'#64748b',font:{size:9},callback:val=>v.fmt==='e'?val.toExponential(1):val}}}}
+      });
+    },0);
+  });
+}
+
+// ═══════ ACP ═══════
+function renderPCA(){
+  if(charts.pca)charts.pca.destroy();
+  const pts=GK.map(k=>{
+    const nv=key=>normAuto(DATA[k].MEAN[key],key);
+    const pc1=(nv('_T_yearlym')*2+nv('_T_maxmean')+nv('_T_minmean')*1.5+nv('_solarmean')*1.5-nv('_P_yearlym')*.8-nv('_T_seasonm')*.5)/6.3*4-1.5;
+    const pc2=(nv('aermssdul')+nv('aermssdum')*.8+nv('aermssdus')*.8+nv('tcw')*.8+nv('_windmean')*.5-nv('_T_minmean')*1.5)/5.4*3-1.2;
+    return{x:pc1,y:pc2,label:GROUPS[k].short,color:GROUPS[k].color,group:k};
+  });
+  charts.pca=new Chart(document.getElementById('pca-chart'),{
+    type:'scatter',
+    data:{datasets:[{data:pts,backgroundColor:pts.map(p=>hexA(p.color,.22)),borderColor:pts.map(p=>p.color),borderWidth:2,pointRadius:26,pointHoverRadius:28}]},
+    options:{responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>{const p=ctx.raw;return[`${GROUPS[p.group].label}`,`PC1:${p.x.toFixed(2)} | PC2:${p.y.toFixed(2)}`];}},
+          backgroundColor:'#1a1b2e',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#e2e8f0',bodyColor:'#94a3b8'}},
+      scales:{
+        x:{title:{display:true,text:'PC1 — Température / Insolation →',color:'#475569',font:{size:12}},grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#64748b'}},
+        y:{title:{display:true,text:'PC2 — Aérosols / Humidité →',color:'#475569',font:{size:12}},grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#64748b'}}}},
+    plugins:[{id:'lbl',afterDraw(chart){
+      const ctx2=chart.ctx;
+      chart.data.datasets[0].data.forEach((p,i)=>{
+        const m=chart.getDatasetMeta(0).data[i];
+        ctx2.save();ctx2.fillStyle=p.color;ctx2.font="bold 11px 'DM Sans',sans-serif";
+        ctx2.textAlign='center';ctx2.textBaseline='middle';ctx2.fillText(p.label,m.x,m.y);ctx2.restore();
+      });
+    }}]
+  });
+
+  const clInfo=[
+    {k:'E',traits:["T° annuelle record : 26.2°C","T° min record : 22.4°C (jamais <21°C)","Insolation max : 16 337 kJ/m²/j","Saisonnalité T quasi nulle (σ×100=84)","Précip. max : 1 863 mm/an","TCW record : 42.3 kg/m²","Sea salt ssm record : 1.0×10⁻⁴","Dust quasi nul : ~1×10⁻⁷"]},
+    {k:'C',traits:["T° max 2ème : 28.4°C","Forte saisonnalité P : 38.9","Précip. faibles : 648 mm","Insolation 2ème : 13 582 kJ/m²/j","Vent fort : 5.6 m/s","Dust élevé : 2.0×10⁻⁵"]},
+    {k:'D',traits:["Dust le plus élevé : 4.1×10⁻⁵","T° min négative : -1.1°C","Grande variabilité T : σ=2.7°C","Précip. élevées : 921 mm","Saisonnalité T max : 603"]},
+    {k:'A',traits:["Sea salt ssm élevé : 4.6×10⁻⁵","Précip. intermédiaires : 893 mm","T° modérée : 12.1°C","T° min faible : 2.7°C"]},
+    {k:'B',traits:["Faible saisonnalité P : 12.2","Précip. faibles : 696 mm","T° basse : 10.8°C","Sea salt ssm : 4.9×10⁻⁵"]},
+  ];
+  const cg=document.getElementById('cluster-grid');cg.innerHTML='';
+  clInfo.forEach(cl=>{
+    const g=GROUPS[cl.k];
+    const d=document.createElement('div');d.className='cluster-card';d.style.borderLeftColor=g.color;
+    d.innerHTML=`<div style="color:${g.color};font-weight:700;margin-bottom:7px;font-size:13px">${g.label}</div>`
+      +cl.traits.map(t=>`<li>${t}</li>`).join('');
+    cg.appendChild(d);
+  });
+}
+
+// ═══════ INIT ═══════
+document.addEventListener('DOMContentLoaded',()=>{
+  Chart.defaults.color='#94a3b8';
+  Chart.defaults.font.family="'DM Sans',sans-serif";
+  renderTable();
+  buildVarSelect('bp-var-sel'); renderBoxplots();
+  buildRadarGroupBtns(); buildVarCheckboxes(); renderRadar();
+  buildVarSelect('cmp-var-sel');
+  buildStatPills('cmp-stat-pills',cmpStat,s=>{cmpStat=s;renderComparaison();});
+  renderComparaison();
+  renderAllVars();
+  renderPCA();
+});
+</script>
+</body>
+</html>
